@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/nicholasss/gator/internal/config"
 )
 
@@ -14,7 +16,7 @@ type command struct {
 }
 
 type commands struct {
-	names map[string]func(*state, command) error
+	commands map[string]func(*state, command) error
 }
 
 // state... holds the state of the program
@@ -22,9 +24,15 @@ type state struct {
 	cfg *config.Config
 }
 
+func newCommands() *commands {
+	var cmds commands
+	cmds.commands = make(map[string]func(*state, command) error)
+	return &cmds
+}
+
 func handlerLogin(s *state, c command) error {
 	if len(c.arguments) == 0 {
-		return fmt.Errorf("Expected name in c.arguments")
+		return fmt.Errorf("Expected username in c.arguments\n")
 	}
 
 	username := c.arguments[0]
@@ -37,14 +45,28 @@ func handlerLogin(s *state, c command) error {
 	return nil
 }
 
-// registers a new command handler function
-func (c *commands) register(name string, f func(*state, command) error) {
+// registers a new command handler function.
+// added an error return value for uninitialized map.
+func (c *commands) register(name string, f func(*state, command) error) error {
+	if c.commands == nil { // uninitialized map
+		return fmt.Errorf("Uninitialized map was passed in commands struct.\n")
+	}
 
-	return
+	c.commands[name] = f
+	return nil
 }
 
 // runs a given command with the provided state (if it exists)
 func (c *commands) run(s *state, cmd command) error {
+	handlerFunc, ok := c.commands[cmd.name]
+	if !ok {
+		return fmt.Errorf("%v is not a registered handler.\n", cmd.name)
+	}
+
+	err := handlerFunc(s, cmd)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -54,18 +76,32 @@ func main() {
 	cfg, err := config.Read()
 	if err != nil {
 		fmt.Printf("Error occured: %v\n", err)
+		os.Exit(1)
 		return
 	}
 
-	// set username, which will write to disk
-	cfg.SetUser(username)
+	state := state{
+		cfg: &cfg,
+	}
 
-	// read again from disk
-	cfg, err = config.Read()
+	cmds := newCommands()
+	cmds.register("login", handlerLogin)
+
+	args := os.Args
+	numArgs := len(args)
+	if numArgs < 2 {
+		fmt.Printf("Not enough arguments provided: %d\nArgs: %v\n", numArgs-1, args[1:])
+		os.Exit(1)
+	}
+
+	cmd := command{
+		name:      args[1],  // command name
+		arguments: args[2:], // inclusive of the arguments after command name
+	}
+
+	err = cmds.run(&state, cmd)
 	if err != nil {
-		fmt.Printf("Error occured: %v\n", err)
-		return
+		fmt.Printf("command error: %v", err)
+		os.Exit(1)
 	}
-
-	fmt.Printf("Config file: %+v\n", cfg)
 }
