@@ -12,6 +12,7 @@ import (
 	"github.com/nicholasss/gator/internal/config"
 	"github.com/nicholasss/gator/internal/database"
 
+	// imported postgres driver for side effects
 	_ "github.com/lib/pq"
 )
 
@@ -82,6 +83,14 @@ func handlerLogin(s *state, c command) error {
 
 	username := c.arguments[0]
 	username = strings.ToTitle(username)
+
+	// check database for user
+	dbFoundUser, _ := s.db.GetUser(context.Background(), username)
+	if dbFoundUser.Name != username { // user not in database
+		fmt.Printf("User '%s' does not exists.\n", username)
+		os.Exit(1)
+	}
+
 	err := s.cfg.SetUser(username)
 	if err != nil {
 		return err
@@ -99,13 +108,13 @@ func handlerRegister(s *state, c command) error {
 	}
 
 	// name processing
-	name := c.arguments[0]
-	name = strings.ToTitle(name)
+	username := c.arguments[0]
+	username = strings.ToTitle(username)
 
 	// check in the DB for existing user
-	dbFoundUser, err := s.db.GetUser(context.Background(), name)
-	if dbFoundUser.Name == name {
-		fmt.Printf("User '%s' already exists.\n", name)
+	dbFoundUser, err := s.db.GetUser(context.Background(), username)
+	if dbFoundUser.Name == username {
+		fmt.Printf("User '%s' already exists.\n", username)
 		os.Exit(1)
 	}
 
@@ -115,7 +124,7 @@ func handlerRegister(s *state, c command) error {
 			ID:        uuid.New(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
-			Name:      name,
+			Name:      username,
 		})
 	if err != nil {
 		fmt.Printf("Error inserting new user: %s\n", err)
@@ -123,8 +132,8 @@ func handlerRegister(s *state, c command) error {
 	}
 
 	// changes to this new user in the config
-	s.cfg.SetUser(name)
-	fmt.Printf("New user was created: '%s\nUser: %+v\n", name, dbUser)
+	s.cfg.SetUser(username)
+	fmt.Printf("New user was created: '%s\nUser: %+v\n", username, dbUser)
 	return nil
 }
 
