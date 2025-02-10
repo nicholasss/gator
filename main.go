@@ -42,6 +42,11 @@ type state struct {
 
 // checks for number of arguments
 func checkNumArgs(args []string, targetArgNum int) error {
+	// early return if the target of arguments is zero
+	if targetArgNum == 0 && len(args) == 0 {
+		return nil
+	}
+
 	num := len(args)
 	if num == 0 {
 		return fmt.Errorf("no arguments were passed in.\n")
@@ -140,7 +145,12 @@ func handlerRegister(s *state, c command) error {
 }
 
 // resets database by deleting all records on user table
-func handlerReset(s *state, _ command) error {
+func handlerReset(s *state, c command) error {
+	targetArgs := 0
+	if err := checkNumArgs(c.arguments, targetArgs); err != nil {
+		return err
+	}
+
 	err := s.db.ResetUsers(context.Background())
 	if err != nil {
 		fmt.Println("Unable to reset 'user' table.")
@@ -154,6 +164,32 @@ func handlerReset(s *state, _ command) error {
 // shows a list of all users from database,
 // as well as the current logged in user
 func handlerUsers(s *state, c command) error {
+	targetArgs := 0
+	if err := checkNumArgs(c.arguments, targetArgs); err != nil {
+		return err
+	}
+
+	currentName := s.cfg.CurrentUsername
+
+	dbUsers, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		fmt.Println("Unable to query list of users in database.")
+		return err
+	}
+
+	if len(dbUsers) == 0 {
+		fmt.Println("There are currently no registered users.")
+		return nil
+	}
+
+	for _, user := range dbUsers {
+		name := user.Name
+		if name == currentName {
+			name += " (current)"
+		}
+
+		fmt.Printf("* %s\n", name)
+	}
 
 	return nil
 }
@@ -227,6 +263,7 @@ func main() {
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
 	cmds.registerCommand("reset", handlerReset)
+	cmds.registerCommand("users", handlerUsers)
 
 	// processing arguments
 	// set to require 2 arguments, command and string
