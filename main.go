@@ -82,7 +82,7 @@ func handlerLogin(s *state, c command) error {
 	}
 
 	username := c.arguments[0]
-	username = strings.ToTitle(username)
+	username = strings.ToLower(username)
 
 	// check database for user
 	dbFoundUser, _ := s.db.GetUser(context.Background(), username)
@@ -109,7 +109,7 @@ func handlerRegister(s *state, c command) error {
 
 	// name processing
 	username := c.arguments[0]
-	username = strings.ToTitle(username)
+	username = strings.ToLower(username)
 
 	// check in the DB for existing user
 	dbFoundUser, err := s.db.GetUser(context.Background(), username)
