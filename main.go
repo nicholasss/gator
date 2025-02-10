@@ -1,15 +1,23 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/nicholasss/gator/internal/config"
+	"github.com/nicholasss/gator/internal/database"
 
 	_ "github.com/lib/pq"
 )
 
-const username = "Nick"
+// ================
+// TYPE DEFINITIONS
+// ================
 
 // name is the command, and arguments are the 1-many arguments being supplied
 type command struct {
@@ -23,33 +31,117 @@ type commands struct {
 
 // state... holds the state of the program
 type state struct {
+	db  *database.Queries
 	cfg *config.Config
 }
 
+// =============
+// UTILITY FUNCS
+// =============
+
+// checks for number of arguments
+func checkNumArgs(args []string, targetArgNum int) error {
+	num := len(args)
+	if num == 0 {
+		return fmt.Errorf("no arguments were passed in.\n")
+	} else if num > targetArgNum {
+		return fmt.Errorf("too many arguments were provided. needs %d\n", targetArgNum)
+	}
+	return nil
+}
+
+// ================
+// COMMAND HANDLERS
+// ================
+
+// list of valid command handlers
+var validCommands map[string]string = map[string]string{
+	"login":    "Logs into a user",
+	"register": "Registers a new user",
+	"help":     "Shows available commands",
+}
+
+// prints out valid commands
+func handlerHelp(_ *state, _ command) error {
+	fmt.Println("Available commands:")
+	for cName, cDesc := range validCommands {
+		fmt.Printf(" - %s: %s\n", cName, cDesc)
+	}
+	fmt.Println("")
+
+	return nil
+}
+
+// logs in a given user
+// sets the given user within the configuration json
+func handlerLogin(s *state, c command) error {
+	targetArgNum := 1
+	if err := checkNumArgs(c.arguments, targetArgNum); err != nil {
+		return err
+	}
+
+	username := c.arguments[0]
+	username = strings.ToTitle(username)
+	err := s.cfg.SetUser(username)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Logged into username:'%v' successfully.\n", username)
+	return nil
+}
+
+// registers a new user
+func handlerRegister(s *state, c command) error {
+	targetArgNum := 1
+	if err := checkNumArgs(c.arguments, targetArgNum); err != nil {
+		return err
+	}
+
+	// name processing
+	name := c.arguments[0]
+	name = strings.ToTitle(name)
+
+	// check in the DB for existing user
+	dbFoundUser, err := s.db.GetUser(context.Background(), name)
+	if dbFoundUser.Name == name {
+		fmt.Printf("User '%s' already exists.\n", name)
+		os.Exit(1)
+	}
+
+	// if username does not exist create a new user in the database
+	dbUser, err := s.db.CreateUser(context.Background(),
+		database.CreateUserParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Name:      name,
+		})
+	if err != nil {
+		fmt.Printf("Error inserting new user: %s\n", err)
+		os.Exit(1)
+	}
+
+	// changes to this new user in the config
+	s.cfg.SetUser(name)
+	fmt.Printf("New user was created: '%s\nUser: %+v\n", name, dbUser)
+	return nil
+}
+
+// ==================
+// COMMAND MANAGEMENT
+// ==================
+
+// new commands struct that holds the command map
 func newCommands() *commands {
 	var cmds commands
 	cmds.commands = make(map[string]func(*state, command) error)
 	return &cmds
 }
 
-func handlerLogin(s *state, c command) error {
-	if len(c.arguments) == 0 {
-		return fmt.Errorf("Expected username in c.arguments\n")
-	}
-
-	username := c.arguments[0]
-	err := s.cfg.SetUser(username)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Set username to '%v' successfully.\n", username)
-	return nil
-}
-
 // registers a new command handler function.
 // added an error return value for uninitialized map.
-func (c *commands) register(name string, f func(*state, command) error) error {
+func (c *commands) registerCommand(name string, f func(*state, command) error) error {
 	if c.commands == nil { // uninitialized map
 		return fmt.Errorf("Uninitialized map was passed in commands struct.\n")
 	}
@@ -58,7 +150,7 @@ func (c *commands) register(name string, f func(*state, command) error) error {
 	return nil
 }
 
-// runs a given command with the provided state (if it exists)
+// runs a given command with the provided state
 func (c *commands) run(s *state, cmd command) error {
 	handlerFunc, ok := c.commands[cmd.name]
 	if !ok {
@@ -73,22 +165,41 @@ func (c *commands) run(s *state, cmd command) error {
 	return nil
 }
 
+// =========
+// MAIN FUNC
+// =========
+
 func main() {
-	// read cfg from disk
+	// read saved config from home directory
 	cfg, err := config.Read()
 	if err != nil {
 		fmt.Printf("Error occured: %v\n", err)
 		os.Exit(1)
-		return
 	}
 
+	// opening database connection
+	db, err := sql.Open("postgres", cfg.DBURL)
+	if err != nil {
+		fmt.Printf("Error occured: %v", err)
+		os.Exit(1)
+	}
+
+	// setting up program state
+	dbQueries := database.New(db)
 	state := state{
+		db:  dbQueries,
 		cfg: &cfg,
 	}
 
+	// registering commands
 	cmds := newCommands()
-	cmds.register("login", handlerLogin)
+	cmds.registerCommand("help", handlerHelp)
+	cmds.registerCommand("login", handlerLogin)
+	cmds.registerCommand("register", handlerRegister)
 
+	// processing arguments
+	// set to require 2 arguments, command and string
+	// e.g. "register <name>", "login <name>"
 	args := os.Args
 	numArgs := len(args)
 	if numArgs < 2 {
@@ -101,9 +212,10 @@ func main() {
 		arguments: args[2:], // inclusive of the arguments after command name
 	}
 
+	// runs the command
 	err = cmds.run(&state, cmd)
 	if err != nil {
-		fmt.Printf("command error: %v", err)
+		fmt.Printf("command error: %v\n", err)
 		os.Exit(1)
 	}
 }
