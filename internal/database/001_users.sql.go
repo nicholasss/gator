@@ -13,7 +13,13 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-insert into users (id, created_at, updated_at, name)
+insert into
+	users (
+	id,
+	created_at,
+	updated_at,
+	name
+)
 values (
 	$1,
 	$2,
@@ -48,9 +54,10 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUser = `-- name: GetUser :one
-select id, created_at, updated_at, name from users
-where name = $1
-limit 1
+select id, created_at, updated_at, name 
+	from users
+	where name = $1
+	limit 1
 `
 
 func (q *Queries) GetUser(ctx context.Context, name string) (User, error) {
@@ -63,4 +70,47 @@ func (q *Queries) GetUser(ctx context.Context, name string) (User, error) {
 		&i.Name,
 	)
 	return i, err
+}
+
+const getUsers = `-- name: GetUsers :many
+select id, created_at, updated_at, name
+	from users
+`
+
+func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resetUsers = `-- name: ResetUsers :exec
+delete
+	from users
+`
+
+func (q *Queries) ResetUsers(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, resetUsers)
+	return err
 }

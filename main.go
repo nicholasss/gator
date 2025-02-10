@@ -57,9 +57,11 @@ func checkNumArgs(args []string, targetArgNum int) error {
 
 // list of valid command handlers
 var validCommands map[string]string = map[string]string{
+	"help":     "Shows available commands",
 	"login":    "Logs into a user",
 	"register": "Registers a new user",
-	"help":     "Shows available commands",
+	"reset":    "Reset the 'users' table",
+	"users":    "Shows a list of all users",
 }
 
 // prints out valid commands
@@ -137,6 +139,25 @@ func handlerRegister(s *state, c command) error {
 	return nil
 }
 
+// resets database by deleting all records on user table
+func handlerReset(s *state, _ command) error {
+	err := s.db.ResetUsers(context.Background())
+	if err != nil {
+		fmt.Println("Unable to reset 'user' table.")
+		return err
+	}
+
+	fmt.Println("Reset 'user' table successfully.")
+	return nil
+}
+
+// shows a list of all users from database,
+// as well as the current logged in user
+func handlerUsers(s *state, c command) error {
+
+	return nil
+}
+
 // ==================
 // COMMAND MANAGEMENT
 // ==================
@@ -205,6 +226,7 @@ func main() {
 	cmds.registerCommand("help", handlerHelp)
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
+	cmds.registerCommand("reset", handlerReset)
 
 	// processing arguments
 	// set to require 2 arguments, command and string
