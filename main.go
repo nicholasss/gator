@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/nicholasss/gator/internal/config"
+
+	_ "github.com/lib/pq"
 )
 
 const username = "Nick"
