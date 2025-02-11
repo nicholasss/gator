@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/xml"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -15,6 +18,8 @@ import (
 	// imported postgres driver for side effects
 	_ "github.com/lib/pq"
 )
+
+const agent = "gator"
 
 // ================
 // TYPE DEFINITIONS
@@ -62,9 +67,32 @@ type RSSItem struct {
 // RSS FUNCTIONS
 // =============
 
+// fetches an rss feed from given URL and returns a reference to it
 func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", feedURL, nil)
+	if err != nil {
+		return &RSSFeed{}, err
+	}
 
-	return &RSSFeed{}, nil
+	req.Header.Set("User-Agent", agent)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return &RSSFeed{}, err
+	}
+	defer res.Body.Close()
+
+	rawBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return &RSSFeed{}, err
+	}
+
+	var feed *RSSFeed
+	err = xml.Unmarshal(rawBody, feed)
+	if err != nil {
+		return &RSSFeed{}, err
+	}
+
+	return feed, nil
 }
 
 // =============
