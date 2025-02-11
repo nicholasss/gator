@@ -36,6 +36,37 @@ type state struct {
 	cfg *config.Config
 }
 
+// =========
+// RSS TYPES
+// =========
+
+// RSS feed is one feed with information and child items
+type RSSFeed struct {
+	Channel struct {
+		Title       string    `xml:"title"`
+		Link        string    `xml:"link"`
+		Description string    `xml:"description"`
+		Item        []RSSItem `xml:"item"`
+	} `xml:"channel"`
+}
+
+// One item from a larger RSS feed
+type RSSItem struct {
+	Title       string `xml:"title"`
+	Link        string `xml:"link"`
+	Description string `xml:"description"`
+	PubDate     string `xml:"pubDate"`
+}
+
+// =============
+// RSS FUNCTIONS
+// =============
+
+func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
+
+	return &RSSFeed{}, nil
+}
+
 // =============
 // UTILITY FUNCS
 // =============
