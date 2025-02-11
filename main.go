@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/xml"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"os"
@@ -51,7 +52,7 @@ type RSSFeed struct {
 		Title       string    `xml:"title"`
 		Link        string    `xml:"link"`
 		Description string    `xml:"description"`
-		Item        []RSSItem `xml:"item"`
+		Items       []RSSItem `xml:"item"`
 	} `xml:"channel"`
 }
 
@@ -81,18 +82,29 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	}
 	defer res.Body.Close()
 
-	rawBody, err := io.ReadAll(res.Body)
+	rawFeed, err := io.ReadAll(res.Body)
 	if err != nil {
 		return &RSSFeed{}, err
 	}
 
-	var feed *RSSFeed
-	err = xml.Unmarshal(rawBody, feed)
+	var feed RSSFeed
+	err = xml.Unmarshal(rawFeed, &feed)
 	if err != nil {
 		return &RSSFeed{}, err
 	}
 
-	return feed, nil
+	// removing html artifacts
+	feed.Channel.Title = html.UnescapeString(feed.Channel.Title)
+	feed.Channel.Description = html.UnescapeString(feed.Channel.Description)
+	for i := range feed.Channel.Items {
+		// has to be the items index to reference
+		// if its the item (e.g. i, item :=) then
+		// it is only modifying a copy of the item
+		feed.Channel.Items[i].Title = html.UnescapeString(feed.Channel.Items[i].Title)
+		feed.Channel.Items[i].Description = html.UnescapeString(feed.Channel.Items[i].Description)
+	}
+
+	return &feed, nil
 }
 
 // =============
@@ -126,10 +138,38 @@ var validCommands map[string]string = map[string]string{
 	"register": "Registers a new user",
 	"reset":    "Reset the 'users' table",
 	"users":    "Shows a list of all users",
+	"agg":      "Performs a fetch of a link",
+}
+
+// aggregation command
+func handlerAgg(s *state, c command) error {
+	if err := checkNumArgs(c.arguments, 0); err != nil {
+		return err
+	}
+
+	// TODO: fix the whole no command to run the aggregator thing
+
+	var URL string = ""
+	if URL == "" {
+		URL = "https://www.wagslane.dev/index.xml"
+	}
+
+	feed, err := fetchFeed(context.Background(), URL)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%+v\n", feed)
+
+	return nil
 }
 
 // prints out valid commands
-func handlerHelp(_ *state, _ command) error {
+func handlerHelp(_ *state, c command) error {
+	if err := checkNumArgs(c.arguments, 0); err != nil {
+		return err
+	}
+
 	fmt.Println("Available commands:")
 	for cName, cDesc := range validCommands {
 		fmt.Printf(" - %s: %s\n", cName, cDesc)
@@ -318,6 +358,7 @@ func main() {
 
 	// registering commands
 	cmds := newCommands()
+	cmds.registerCommand("agg", handlerAgg)
 	cmds.registerCommand("help", handlerHelp)
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
