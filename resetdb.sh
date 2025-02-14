@@ -5,9 +5,9 @@ if [ -f ./.env ]; then
 
 	cd ./sql/schema
 	echo -e '\n === dropping all tables in database'
-	goose $GOOSE_DRIVER $GOOSE_DBSTRING down
+	goose down $GOOSE_DRIVER $GOOSE_DBSTRING
 	echo -e '\n === migrating to latest'
-	goose $GOOSE_DRIVER $GOOSE_DBSTRING up
+	goose up $GOOSE_DRIVER $GOOSE_DBSTRING
 
 else
 	echo -e '\n === WARNING: ".\.env" file not found.\n === Did not perform database reset.\n'
