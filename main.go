@@ -151,7 +151,11 @@ func handlerAddFeed(s *state, c command) error {
 
 	username := s.cfg.CurrentUsername
 	user, err := s.db.GetUser(context.Background(), username)
-	if err != nil {
+	if err == sql.ErrNoRows {
+		fmt.Println("It does not look like you are logged in.")
+		fmt.Println("Please ensure that you are registered and logged in.")
+		os.Exit(1)
+	} else if err != nil {
 		return err
 	}
 
@@ -159,9 +163,20 @@ func handlerAddFeed(s *state, c command) error {
 	name := c.arguments[0]
 	URL := c.arguments[1]
 
-	s.db.CreateFeed(context.Background(), database.CreateFeedRow{
-		ID: uuid.New(),
+	newFeed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      name,
+		Url:       URL,
+		UserID:    userID,
 	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%+v\n", newFeed)
+	return nil
 }
 
 // aggregation command
