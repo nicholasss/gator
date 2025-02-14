@@ -112,6 +112,7 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 // =============
 
 // checks for number of arguments
+// TODO: rewrite to make more sense. Should check for exactly the target number.
 func checkNumArgs(args []string, targetArgNum int) error {
 	// early return if the target of arguments is zero
 	if targetArgNum == 0 && len(args) == 0 {
@@ -133,12 +134,34 @@ func checkNumArgs(args []string, targetArgNum int) error {
 
 // list of valid command handlers
 var validCommands map[string]string = map[string]string{
+	"addfeed":  "Adds a new feed to follow",
+	"agg":      "Performs a fetch of a link",
 	"help":     "Shows available commands",
 	"login":    "Logs into a user",
 	"register": "Registers a new user",
 	"reset":    "Reset the 'users' table",
 	"users":    "Shows a list of all users",
-	"agg":      "Performs a fetch of a link",
+}
+
+// add feed command
+func handlerAddFeed(s *state, c command) error {
+	if err := checkNumArgs(c.arguments, 2); err != nil {
+		return err
+	}
+
+	username := s.cfg.CurrentUsername
+	user, err := s.db.GetUser(context.Background(), username)
+	if err != nil {
+		return err
+	}
+
+	userID := user.ID
+	name := c.arguments[0]
+	URL := c.arguments[1]
+
+	s.db.CreateFeed(context.Background(), database.CreateFeedRow{
+		ID: uuid.New(),
+	})
 }
 
 // aggregation command
@@ -358,6 +381,7 @@ func main() {
 
 	// registering commands
 	cmds := newCommands()
+	cmds.registerCommand("addfeed", handlerAddFeed)
 	cmds.registerCommand("agg", handlerAgg)
 	cmds.registerCommand("help", handlerHelp)
 	cmds.registerCommand("login", handlerLogin)

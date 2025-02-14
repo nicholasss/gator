@@ -1,4 +1,4 @@
--- +goose up
+-- +goose Up
 create table feeds (
 	id uuid primary key,
 	created_at timestamp not null,
@@ -14,5 +14,5 @@ alter table feeds
 	references users(id)
 	on delete cascade;
 
--- +goose down
+-- +goose Down
 drop table feeds;

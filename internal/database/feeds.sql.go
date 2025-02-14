@@ -7,7 +7,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,12 +22,12 @@ returning id, name, created_at, updated_at, url, user_id
 `
 
 type CreateFeedParams struct {
-	Column1 uuid.NullUUID
-	Column2 sql.NullString
-	Column3 sql.NullTime
-	Column4 sql.NullTime
-	Column5 sql.NullString
-	Column6 uuid.NullUUID
+	ID        uuid.UUID
+	Name      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Url       string
+	UserID    uuid.UUID
 }
 
 type CreateFeedRow struct {
@@ -42,12 +41,12 @@ type CreateFeedRow struct {
 
 func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (CreateFeedRow, error) {
 	row := q.db.QueryRowContext(ctx, createFeed,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
+		arg.ID,
+		arg.Name,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.Url,
+		arg.UserID,
 	)
 	var i CreateFeedRow
 	err := row.Scan(
@@ -59,4 +58,79 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (CreateF
 		&i.UserID,
 	)
 	return i, err
+}
+
+const getFeedName = `-- name: GetFeedName :one
+select id, created_at, updated_at, name, url, user_id from feeds
+	where name = $1
+	limit 1
+`
+
+func (q *Queries) GetFeedName(ctx context.Context, name string) (Feed, error) {
+	row := q.db.QueryRowContext(ctx, getFeedName, name)
+	var i Feed
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Url,
+		&i.UserID,
+	)
+	return i, err
+}
+
+const getFeedURL = `-- name: GetFeedURL :one
+select id, created_at, updated_at, name, url, user_id from feeds
+	where url = $1
+	limit 1
+`
+
+func (q *Queries) GetFeedURL(ctx context.Context, url string) (Feed, error) {
+	row := q.db.QueryRowContext(ctx, getFeedURL, url)
+	var i Feed
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Url,
+		&i.UserID,
+	)
+	return i, err
+}
+
+const getUsersFeeds = `-- name: GetUsersFeeds :many
+select id, created_at, updated_at, name, url, user_id from feeds
+	where user_id = $1
+`
+
+func (q *Queries) GetUsersFeeds(ctx context.Context, userID uuid.UUID) ([]Feed, error) {
+	rows, err := q.db.QueryContext(ctx, getUsersFeeds, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Feed
+	for rows.Next() {
+		var i Feed
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Url,
+			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
