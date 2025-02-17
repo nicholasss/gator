@@ -139,7 +139,7 @@ var validCommands map[string]string = map[string]string{
 	"help":     "Shows available commands",
 	"login":    "Logs into a user",
 	"register": "Registers a new user",
-	"reset":    "Reset the 'users' table",
+	"reset":    "Reset the 'users' and the 'feeds' table",
 	"users":    "Shows a list of all users",
 }
 
@@ -309,6 +309,7 @@ func handlerRegister(s *state, c command) error {
 }
 
 // resets database by deleting all records on user table
+// this will delete the records in the feeds table as well.
 func handlerReset(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 0); err != nil {
 		return err
