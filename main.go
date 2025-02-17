@@ -112,20 +112,19 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 // =============
 
 // checks for number of arguments
-// TODO: rewrite to make more sense. Should check for exactly the target number.
 func checkNumArgs(args []string, targetArgNum int) error {
-	// early return if the target of arguments is zero
-	if targetArgNum == 0 && len(args) == 0 {
+	numArgs := len(args)
+	if numArgs == targetArgNum {
 		return nil
 	}
 
-	num := len(args)
-	if num == 0 {
-		return fmt.Errorf("no arguments were passed in.\n")
-	} else if num > targetArgNum {
-		return fmt.Errorf("too many arguments were provided. needs %d\n", targetArgNum)
+	if numArgs > targetArgNum {
+		return fmt.Errorf("too many arguments were provided. Needs %d\n", targetArgNum)
+	} else if numArgs < targetArgNum {
+		return fmt.Errorf("not enough arguments were provided. Need %d\n", targetArgNum)
 	}
-	return nil
+
+	return fmt.Errorf("error processing arguments in main.go:checkNumArgs()")
 }
 
 // ================
