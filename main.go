@@ -136,6 +136,7 @@ var validCommands map[string]string = map[string]string{
 	"addfeed":  "Adds a new feed to follow",
 	"agg":      "Performs a fetch of a link",
 	"feeds":    "Shows a list of all feeds",
+	"follow":   "Follow a feed",
 	"help":     "Shows available commands",
 	"login":    "Logs into a user",
 	"register": "Registers a new user",
@@ -227,6 +228,46 @@ func handlerFeeds(s *state, c command) error {
 		fmt.Printf(" - URL:  %s\n", feed.Url)
 		fmt.Printf("\n")
 	}
+
+	return nil
+}
+
+// as the current user, follows a feed
+// prints the name of the feed and the current user
+func handlerFollow(s *state, c command) error {
+	if err := checkNumArgs(c.arguments, 1); err != nil {
+		return fmt.Errorf("handlerFollow func expected 1 arg: %w", err)
+	}
+
+	URL := c.arguments[0]
+	feedRecord, err := s.db.GetFeedURL(context.Background(), URL)
+	if err != nil {
+		return fmt.Errorf("handlerfollow error fetching feed by url: %w", err)
+	}
+
+	user := s.cfg.CurrentUsername
+	userRecord, err := s.db.GetUserByName(context.Background(), user)
+	if err != nil {
+		return fmt.Errorf("handlerFollow error fetching user by name from config: %w", err)
+	}
+
+	feedFollowRecord, err := s.db.CreateFeedFollow(context.Background(),
+		database.CreateFeedFollowParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			UserID:    userRecord.ID,
+			FeedID:    feedRecord.ID,
+		})
+	if err != nil {
+		return fmt.Errorf("handlerFollow error creating feed follow record: %w", err)
+	}
+
+	fmt.Printf("User %s is now following\n", userRecord.Name)
+	fmt.Printf("feed %s\n", feedRecord.Url)
+
+	// debug info
+	fmt.Printf(" &&& feed follow id: %s", feedFollowRecord.ID)
 
 	return nil
 }
@@ -425,6 +466,7 @@ func main() {
 	cmds.registerCommand("addfeed", handlerAddFeed)
 	cmds.registerCommand("agg", handlerAgg)
 	cmds.registerCommand("feeds", handlerFeeds)
+	cmds.registerCommand("follow", handlerFollow)
 	cmds.registerCommand("help", handlerHelp)
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
