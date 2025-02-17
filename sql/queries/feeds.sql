@@ -6,6 +6,9 @@ insert into feeds (
 	)
 returning id, name, created_at, updated_at, url, user_id;
 
+-- name: GetAllFeeds :many
+select * from feeds;
+
 -- name: GetFeedName :one
 select * from feeds
 	where name = $1
