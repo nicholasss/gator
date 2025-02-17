@@ -150,7 +150,7 @@ func handlerAddFeed(s *state, c command) error {
 	}
 
 	username := s.cfg.CurrentUsername
-	user, err := s.db.GetUser(context.Background(), username)
+	user, err := s.db.GetUserByName(context.Background(), username)
 	if err == sql.ErrNoRows {
 		fmt.Println("There does not appear to be any registered users.")
 		fmt.Println("Please ensure that you are registered and logged in.")
@@ -204,7 +204,7 @@ func handlerAgg(s *state, c command) error {
 
 // prints out a list of feeds in the database
 func handlerFeeds(s *state, c command) error {
-	if err := checkNumArgs(c.arguments, 1); err != nil {
+	if err := checkNumArgs(c.arguments, 0); err != nil {
 		return err
 	}
 
@@ -213,13 +213,19 @@ func handlerFeeds(s *state, c command) error {
 		return err
 	}
 
-	for i, feed := range feeds {
-		user, err := s.db.GetUserByID()
+	fmt.Printf("List of all feeds in the database:\n")
 
-		fmt.Printf("#%d:\n", i)
-		fmt.Printf(" - User: %s")
-		fmt.Printf(" - Name: %s", feed.Name)
-		fmt.Printf(" - URL:  %s", feed.Url)
+	for i, feed := range feeds {
+		user, err := s.db.GetUserByID(context.Background(), feed.UserID)
+		if err != nil {
+			return fmt.Errorf("unable to get user by id: %w", err)
+		}
+
+		fmt.Printf("Feed #%d:\n", i+1)
+		fmt.Printf(" - User: %s\n", user.Name)
+		fmt.Printf(" - Name: %s\n", feed.Name)
+		fmt.Printf(" - URL:  %s\n", feed.Url)
+		fmt.Printf("\n")
 	}
 
 	return nil
@@ -243,8 +249,7 @@ func handlerHelp(_ *state, c command) error {
 // logs in a given user
 // sets the given user within the configuration json
 func handlerLogin(s *state, c command) error {
-	targetArgNum := 1
-	if err := checkNumArgs(c.arguments, targetArgNum); err != nil {
+	if err := checkNumArgs(c.arguments, 1); err != nil {
 		return err
 	}
 
@@ -252,7 +257,7 @@ func handlerLogin(s *state, c command) error {
 	username = strings.ToLower(username)
 
 	// check database for user
-	dbFoundUser, _ := s.db.GetUser(context.Background(), username)
+	dbFoundUser, _ := s.db.GetUserByName(context.Background(), username)
 	if dbFoundUser.Name != username { // user not in database
 		fmt.Printf("User '%s' does not exists.\n", username)
 		os.Exit(1)
@@ -269,8 +274,7 @@ func handlerLogin(s *state, c command) error {
 
 // registers a new user
 func handlerRegister(s *state, c command) error {
-	targetArgNum := 1
-	if err := checkNumArgs(c.arguments, targetArgNum); err != nil {
+	if err := checkNumArgs(c.arguments, 1); err != nil {
 		return err
 	}
 
@@ -279,7 +283,7 @@ func handlerRegister(s *state, c command) error {
 	username = strings.ToLower(username)
 
 	// check in the DB for existing user
-	dbFoundUser, err := s.db.GetUser(context.Background(), username)
+	dbFoundUser, err := s.db.GetUserByName(context.Background(), username)
 	if dbFoundUser.Name == username {
 		fmt.Printf("User '%s' already exists.\n", username)
 		os.Exit(1)
@@ -306,8 +310,7 @@ func handlerRegister(s *state, c command) error {
 
 // resets database by deleting all records on user table
 func handlerReset(s *state, c command) error {
-	targetArgs := 0
-	if err := checkNumArgs(c.arguments, targetArgs); err != nil {
+	if err := checkNumArgs(c.arguments, 0); err != nil {
 		return err
 	}
 
@@ -324,8 +327,7 @@ func handlerReset(s *state, c command) error {
 // shows a list of all users from database,
 // as well as the current logged in user
 func handlerUsers(s *state, c command) error {
-	targetArgs := 0
-	if err := checkNumArgs(c.arguments, targetArgs); err != nil {
+	if err := checkNumArgs(c.arguments, 0); err != nil {
 		return err
 	}
 
