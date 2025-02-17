@@ -135,6 +135,7 @@ func checkNumArgs(args []string, targetArgNum int) error {
 var validCommands map[string]string = map[string]string{
 	"addfeed":  "Adds a new feed to follow",
 	"agg":      "Performs a fetch of a link",
+	"feeds":    "Shows a list of all feeds",
 	"help":     "Shows available commands",
 	"login":    "Logs into a user",
 	"register": "Registers a new user",
@@ -197,6 +198,29 @@ func handlerAgg(s *state, c command) error {
 	}
 
 	fmt.Printf("%+v\n", feed)
+
+	return nil
+}
+
+// prints out a list of feeds in the database
+func handlerFeeds(s *state, c command) error {
+	if err := checkNumArgs(c.arguments, 1); err != nil {
+		return err
+	}
+
+	feeds, err := s.db.GetAllFeeds(context.Background())
+	if err != nil {
+		return err
+	}
+
+	for i, feed := range feeds {
+		user, err := s.db.GetUserByID()
+
+		fmt.Printf("#%d:\n", i)
+		fmt.Printf(" - User: %s")
+		fmt.Printf(" - Name: %s", feed.Name)
+		fmt.Printf(" - URL:  %s", feed.Url)
+	}
 
 	return nil
 }
@@ -397,6 +421,7 @@ func main() {
 	cmds := newCommands()
 	cmds.registerCommand("addfeed", handlerAddFeed)
 	cmds.registerCommand("agg", handlerAgg)
+	cmds.registerCommand("feeds", handlerFeeds)
 	cmds.registerCommand("help", handlerHelp)
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
