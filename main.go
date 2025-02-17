@@ -152,7 +152,7 @@ func handlerAddFeed(s *state, c command) error {
 	username := s.cfg.CurrentUsername
 	user, err := s.db.GetUser(context.Background(), username)
 	if err == sql.ErrNoRows {
-		fmt.Println("It does not look like you are logged in.")
+		fmt.Println("There does not appear to be any registered users.")
 		fmt.Println("Please ensure that you are registered and logged in.")
 		os.Exit(1)
 	} else if err != nil {
