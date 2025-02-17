@@ -133,15 +133,16 @@ func checkNumArgs(args []string, targetArgNum int) error {
 
 // list of valid command handlers
 var validCommands map[string]string = map[string]string{
-	"addfeed":  "Adds a new feed to follow",
-	"agg":      "Performs a fetch of a link",
-	"feeds":    "Shows a list of all feeds",
-	"follow":   "Follow a feed",
-	"help":     "Shows available commands",
-	"login":    "Logs into a user",
-	"register": "Registers a new user",
-	"reset":    "Reset the 'users' and the 'feeds' table",
-	"users":    "Shows a list of all users",
+	"addfeed":   "Adds a new feed to follow",
+	"agg":       "Performs a fetch of a link",
+	"feeds":     "Shows a list of all feeds",
+	"follow":    "Follow a feed",
+	"following": "Shows a list of all feeds current user is following",
+	"help":      "Shows available commands",
+	"login":     "Logs into a user",
+	"register":  "Registers a new user",
+	"reset":     "Reset the 'users' and the 'feeds' table",
+	"users":     "Shows a list of all users",
 }
 
 // add feed command
@@ -241,7 +242,11 @@ func handlerFollow(s *state, c command) error {
 
 	URL := c.arguments[0]
 	feedRecord, err := s.db.GetFeedURL(context.Background(), URL)
-	if err != nil {
+	if err == sql.ErrNoRows {
+		fmt.Printf("Unable to find the feed by URL.\n")
+		fmt.Printf("You may need to add the feed first, with 'addfeed'.")
+		os.Exit(1)
+	} else if err != nil {
 		return fmt.Errorf("handlerfollow error fetching feed by url: %w", err)
 	}
 
@@ -267,7 +272,13 @@ func handlerFollow(s *state, c command) error {
 	fmt.Printf("feed %s\n", feedRecord.Url)
 
 	// debug info
-	fmt.Printf(" &&& feed follow id: %s", feedFollowRecord.ID)
+	fmt.Printf(" &&& feed follow id: %s\n", feedFollowRecord.ID)
+
+	return nil
+}
+
+// prints out a list of all feeds the current user is following
+func handlerFollowing(s *state, c command) error {
 
 	return nil
 }
@@ -467,6 +478,7 @@ func main() {
 	cmds.registerCommand("agg", handlerAgg)
 	cmds.registerCommand("feeds", handlerFeeds)
 	cmds.registerCommand("follow", handlerFollow)
+	cmds.registerCommand("following", handlerFollowing)
 	cmds.registerCommand("help", handlerHelp)
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
