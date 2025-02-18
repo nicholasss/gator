@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -153,14 +154,40 @@ func scrapeFeeds(s *state) error {
 		return fmt.Errorf("scraping feeds error fetching feeds: %w", err)
 	}
 
-	for _, items := range RSSItems.Channel.Items {
-		if items.Title == "" {
-			continue // skip blank titles
+	for _, item := range RSSItems.Channel.Items {
+		title := item.Title
+		if title == "" {
+			title = "[NO TITLE]"
 		}
 
-		fmt.Printf(" - %s\n", items.Title)
+		description := sql.NullString{}
+		err := description.Scan(item.Description)
+		if err != nil {
+			log.Printf("post description to NullString error: %s\n", err)
+		}
+
+		publishedAt := sql.NullTime{}
+		err = publishedAt.Scan(item.PubDate)
+		if err != nil {
+			log.Printf("post publishedAt to NullTime error: %s\n", err)
+		}
+
+		// save the item to the database
+		postRecord, err := s.db.CreatePost(context.Background(), database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Title:       title,
+			Url:         item.Link,
+			Description: description,
+			PublishedAt: publishedAt,
+			FeedID:      feedRecord.ID,
+		})
+		if err != nil {
+			log.Printf("error inserting to posts table: %s\n", err)
+		}
+
 	}
-	fmt.Printf("\n")
 
 	return nil
 }
@@ -199,6 +226,7 @@ func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) 
 var validCommands map[string]string = map[string]string{
 	"addfeed":   "Adds a new feed and follows it. Requires a Name & URL.",
 	"agg":       "Begins aggregation of feeds.\n   Provide an time interval to wait between each feed.\n   e.g. 30m, 1h, etc.",
+	"browse":    "Browse the downloaded posts from the feeds you follow.\n   Provide an int as a limit of posts.\n   e.g. 1, 5, 20, etc.",
 	"feeds":     "Shows a list of all feeds.",
 	"follow":    "Follow a feed by its URL.",
 	"following": "Shows a list of all feeds the current user is following.",
@@ -272,6 +300,12 @@ func handlerAgg(s *state, c command) error {
 			return err
 		}
 	}
+}
+
+// browse the downloaded posts.
+func handlerBrowse(s *state, c command, user database.User) error {
+
+	return nil
 }
 
 // prints out a list of feeds in the database
