@@ -525,7 +525,7 @@ func main() {
 	cmds.registerCommand("agg", handlerAgg)
 	cmds.registerCommand("feeds", handlerFeeds)
 	cmds.registerCommand("follow", middlewareLoggedIn(handlerFollow))
-	cmds.registerCommand("following", handlerFollowing)
+	cmds.registerCommand("following", middlewareLoggedIn(handlerFollowing))
 	cmds.registerCommand("help", handlerHelp)
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
