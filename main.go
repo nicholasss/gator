@@ -148,7 +148,7 @@ var validCommands map[string]string = map[string]string{
 // add feed command
 func handlerAddFeed(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 2); err != nil {
-		return err
+		return fmt.Errorf("handlerAddFeed was passed wrong number of arguments, expected 2: %w", err)
 	}
 
 	username := s.cfg.CurrentUsername
@@ -158,7 +158,7 @@ func handlerAddFeed(s *state, c command) error {
 		fmt.Println("Please ensure that you are registered and logged in.")
 		os.Exit(1)
 	} else if err != nil {
-		return err
+		return fmt.Errorf("handlerAddFeed error fetching user by name: %w", err)
 	}
 
 	userID := userRecord.ID
@@ -174,7 +174,7 @@ func handlerAddFeed(s *state, c command) error {
 		UserID:    userID,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("handlerAddFeed error inserting new feed: %w", err)
 	}
 
 	feedFollowRecord, err := s.db.CreateFeedFollow(context.Background(),
@@ -194,7 +194,8 @@ func handlerAddFeed(s *state, c command) error {
 // aggregation command
 func handlerAgg(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 0); err != nil {
-		return err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	// TODO: fix the whole no command to run the aggregator thing
@@ -217,12 +218,13 @@ func handlerAgg(s *state, c command) error {
 // prints out a list of feeds in the database
 func handlerFeeds(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 0); err != nil {
-		return err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	feeds, err := s.db.GetAllFeeds(context.Background())
 	if err != nil {
-		return err
+		return fmt.Errorf("handlerFeeds error fetching all feeds: %w", err)
 	}
 
 	fmt.Printf("List of all feeds in the database:\n")
@@ -247,7 +249,8 @@ func handlerFeeds(s *state, c command) error {
 // prints the name of the feed and the current user
 func handlerFollow(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 1); err != nil {
-		return fmt.Errorf("handlerFollow func expected 1 arg: %w", err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	URL := c.arguments[0]
@@ -290,7 +293,8 @@ func handlerFollow(s *state, c command) error {
 // prints out a list of all feeds the current user is following
 func handlerFollowing(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 0); err != nil {
-		return fmt.Errorf("handlerFollowing expected 0 arguments: %w", err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	user := s.cfg.CurrentUsername
@@ -319,7 +323,8 @@ func handlerFollowing(s *state, c command) error {
 // prints out valid commands
 func handlerHelp(_ *state, c command) error {
 	if err := checkNumArgs(c.arguments, 0); err != nil {
-		return err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	fmt.Println("Available commands:")
@@ -335,7 +340,8 @@ func handlerHelp(_ *state, c command) error {
 // sets the given user within the configuration json
 func handlerLogin(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 1); err != nil {
-		return err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	username := c.arguments[0]
@@ -350,7 +356,7 @@ func handlerLogin(s *state, c command) error {
 
 	err := s.cfg.SetUser(username)
 	if err != nil {
-		return err
+		return fmt.Errorf("handlerLogin error setting username in config: %w", err)
 	}
 
 	fmt.Printf("Logged into username:'%v' successfully.\n", username)
@@ -360,7 +366,8 @@ func handlerLogin(s *state, c command) error {
 // registers a new user
 func handlerRegister(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 1); err != nil {
-		return err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	// name processing
@@ -397,13 +404,13 @@ func handlerRegister(s *state, c command) error {
 // this will delete the records in the feeds table as well.
 func handlerReset(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 0); err != nil {
-		return err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	err := s.db.ResetUsers(context.Background())
 	if err != nil {
-		fmt.Println("Unable to reset 'user' table.")
-		return err
+		return fmt.Errorf("handlerReset was unable to reset the users table: %w", err)
 	}
 
 	fmt.Println("Reset 'user' table successfully.")
@@ -414,20 +421,21 @@ func handlerReset(s *state, c command) error {
 // as well as the current logged in user
 func handlerUsers(s *state, c command) error {
 	if err := checkNumArgs(c.arguments, 0); err != nil {
-		return err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	currentName := s.cfg.CurrentUsername
 
 	dbUsers, err := s.db.GetUsers(context.Background())
 	if err != nil {
-		fmt.Println("Unable to query list of users in database.")
-		return err
+		return fmt.Errorf("unable to query list of users in database: %w", err)
 	}
 
 	if len(dbUsers) == 0 {
 		fmt.Println("There are currently no registered users.")
-		return nil
+		fmt.Println("You may need to register first with 'register'.")
+		os.Exit(1)
 	}
 
 	for _, user := range dbUsers {
@@ -468,11 +476,13 @@ func (c *commands) registerCommand(name string, f func(*state, command) error) e
 func (c *commands) run(s *state, cmd command) error {
 	handlerFunc, ok := c.commands[cmd.name]
 	if !ok {
-		return fmt.Errorf("%v is not a registered handler.\n", cmd.name)
+		// the command is either not registered or not valid.
+		return fmt.Errorf("%v is not a valid command.\n", cmd.name)
 	}
 
 	err := handlerFunc(s, cmd)
 	if err != nil {
+		// pass up the error
 		return err
 	}
 
