@@ -198,7 +198,7 @@ func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) 
 // list of valid command handlers
 var validCommands map[string]string = map[string]string{
 	"addfeed":   "Adds a new feed and follows it. Requires a Name & URL.",
-	"agg":       "Performs a fetch of a link",
+	"agg":       "Begins aggregation of feeds.\n   Provide an time interval to wait between each feed.\n   e.g. 30m, 1h, etc.",
 	"feeds":     "Shows a list of all feeds.",
 	"follow":    "Follow a feed by its URL.",
 	"following": "Shows a list of all feeds the current user is following.",
