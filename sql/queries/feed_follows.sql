@@ -24,5 +24,6 @@ select
 from feed_follows
 inner join users
 	on feed_follows.user_id = users.id
+	and feed_follows.user_id = $1
 inner join feeds
 	on feed_follows.feed_id = feeds.id;

@@ -186,6 +186,7 @@ func handlerAddFeed(s *state, c command) error {
 			FeedID:    newFeed.ID,
 		})
 
+	fmt.Printf("%s is following %s\n", userRecord.Name, newFeed.Name)
 	fmt.Printf(" &&& feed id: %s\n", feedFollowRecord.ID)
 	return nil
 }
@@ -250,7 +251,7 @@ func handlerFollow(s *state, c command) error {
 	}
 
 	URL := c.arguments[0]
-	feedRecord, err := s.db.GetFeedURL(context.Background(), URL)
+	feedRecord, err := s.db.GetFeedByURL(context.Background(), URL)
 	if err == sql.ErrNoRows {
 		fmt.Printf("Unable to find the feed by URL.\n")
 		fmt.Printf("You may need to add the feed first, with 'addfeed'.")
@@ -298,14 +299,18 @@ func handlerFollowing(s *state, c command) error {
 		return fmt.Errorf("handlerFollowing error fetching user by name from config: %w", err)
 	}
 
-	userID := userRecord.ID
-	feedRecords, err := s.db.GetUsersFeeds(context.Background(), userID)
+	feedFollowRecords, err := s.db.GetFeedFollowForUser(context.Background(), userRecord.ID)
 	if err != nil {
 		return fmt.Errorf("handlerFollowing error fetching users feeds by user id: %w", err)
 	}
 
 	fmt.Printf("User %s is following:\n", userRecord.Name)
-	for _, feedRecord := range feedRecords {
+	for _, feedFollowRecord := range feedFollowRecords {
+		feedRecord, err := s.db.GetFeedByID(context.Background(), feedFollowRecord.FeedID)
+		if err != nil {
+			return fmt.Errorf("unable to retrieve feed record: %w", err)
+		}
+
 		fmt.Printf(" - %s\n", feedRecord.Name)
 	}
 	return nil

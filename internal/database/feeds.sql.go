@@ -94,14 +94,34 @@ func (q *Queries) GetAllFeeds(ctx context.Context) ([]Feed, error) {
 	return items, nil
 }
 
-const getFeedName = `-- name: GetFeedName :one
+const getFeedByID = `-- name: GetFeedByID :one
+select id, created_at, updated_at, name, url, user_id from feeds
+	where id = $1
+	limit 1
+`
+
+func (q *Queries) GetFeedByID(ctx context.Context, id uuid.UUID) (Feed, error) {
+	row := q.db.QueryRowContext(ctx, getFeedByID, id)
+	var i Feed
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Url,
+		&i.UserID,
+	)
+	return i, err
+}
+
+const getFeedByName = `-- name: GetFeedByName :one
 select id, created_at, updated_at, name, url, user_id from feeds
 	where name = $1
 	limit 1
 `
 
-func (q *Queries) GetFeedName(ctx context.Context, name string) (Feed, error) {
-	row := q.db.QueryRowContext(ctx, getFeedName, name)
+func (q *Queries) GetFeedByName(ctx context.Context, name string) (Feed, error) {
+	row := q.db.QueryRowContext(ctx, getFeedByName, name)
 	var i Feed
 	err := row.Scan(
 		&i.ID,
@@ -114,14 +134,14 @@ func (q *Queries) GetFeedName(ctx context.Context, name string) (Feed, error) {
 	return i, err
 }
 
-const getFeedURL = `-- name: GetFeedURL :one
+const getFeedByURL = `-- name: GetFeedByURL :one
 select id, created_at, updated_at, name, url, user_id from feeds
 	where url = $1
 	limit 1
 `
 
-func (q *Queries) GetFeedURL(ctx context.Context, url string) (Feed, error) {
-	row := q.db.QueryRowContext(ctx, getFeedURL, url)
+func (q *Queries) GetFeedByURL(ctx context.Context, url string) (Feed, error) {
+	row := q.db.QueryRowContext(ctx, getFeedByURL, url)
 	var i Feed
 	err := row.Scan(
 		&i.ID,
@@ -134,13 +154,13 @@ func (q *Queries) GetFeedURL(ctx context.Context, url string) (Feed, error) {
 	return i, err
 }
 
-const getUsersFeeds = `-- name: GetUsersFeeds :many
+const getFeedsByUser = `-- name: GetFeedsByUser :many
 select id, created_at, updated_at, name, url, user_id from feeds
 	where user_id = $1
 `
 
-func (q *Queries) GetUsersFeeds(ctx context.Context, userID uuid.UUID) ([]Feed, error) {
-	rows, err := q.db.QueryContext(ctx, getUsersFeeds, userID)
+func (q *Queries) GetFeedsByUser(ctx context.Context, userID uuid.UUID) ([]Feed, error) {
+	rows, err := q.db.QueryContext(ctx, getFeedsByUser, userID)
 	if err != nil {
 		return nil, err
 	}
