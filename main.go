@@ -127,6 +127,38 @@ func checkNumArgs(args []string, targetArgNum int) error {
 	return fmt.Errorf("error processing arguments in main.go:checkNumArgs()")
 }
 
+func scrapeFeeds(s *state) error {
+	feedRecord, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return fmt.Errorf("scraping feeds error fetching feed list from db: %w", err)
+	}
+
+	// mark it as fetched
+	now := sql.NullTime{}
+	now.Scan(time.Now())
+
+	err = s.db.MarkFeedFetched(context.Background(), database.MarkFeedFetchedParams{
+		ID:            feedRecord.ID,
+		LastFetchedAt: now,
+	})
+	if err != nil {
+		return fmt.Errorf("scraping feeds error updating feed as fetched: %w", err)
+	}
+
+	fmt.Printf("Fetching '%s' feed at '%s'.\n", feedRecord.Name, feedRecord.Url)
+	RSSItems, err := fetchFeed(context.Background(), feedRecord.Url)
+	if err != nil {
+		return fmt.Errorf("scraping feeds error fetching feeds: %w", err)
+	}
+
+	for _, items := range RSSItems.Channel.Items {
+		fmt.Printf(" - %s\n", items.Title)
+	}
+	fmt.Printf("\n")
+
+	return nil
+}
+
 // ==========
 // MIDDLEWARE
 // ==========
