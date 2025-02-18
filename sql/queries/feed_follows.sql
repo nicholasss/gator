@@ -27,3 +27,8 @@ inner join users
 	and feed_follows.user_id = $1
 inner join feeds
 	on feed_follows.feed_id = feeds.id;
+
+-- name: DeleteFeedFollowForUserURL :one
+delete from feed_follows
+where user_id = $1 and feed_id = $2
+returning id, created_at, updated_at, user_id, feed_id;
