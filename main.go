@@ -133,6 +133,8 @@ func scrapeFeeds(s *state) error {
 		return fmt.Errorf("scraping feeds error fetching feed list from db: %w", err)
 	}
 
+	fmt.Printf(" &&& last fetched at %v\n", feedRecord.LastFetchedAt)
+
 	// mark it as fetched
 	now := sql.NullTime{}
 	now.Scan(time.Now())
@@ -152,6 +154,10 @@ func scrapeFeeds(s *state) error {
 	}
 
 	for _, items := range RSSItems.Channel.Items {
+		if items.Title == "" {
+			continue // skip blank titles
+		}
+
 		fmt.Printf(" - %s\n", items.Title)
 	}
 	fmt.Printf("\n")
@@ -240,28 +246,32 @@ func handlerAddFeed(s *state, c command, user database.User) error {
 	return nil
 }
 
-// aggregation command
+// Command to run in another terminal, will fetch the feeds in the background.
+// This function needs to be explicitly terminated.
 func handlerAgg(s *state, c command) error {
-	if err := checkNumArgs(c.arguments, 0); err != nil {
+	if err := checkNumArgs(c.arguments, 1); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	// TODO: fix the whole no command to run the aggregator thing
-
-	var URL string = ""
-	if URL == "" {
-		URL = "https://www.wagslane.dev/index.xml"
-	}
-
-	feed, err := fetchFeed(context.Background(), URL)
+	// takes a duration string as an argument
+	// e.g. 1h, 1m, 30m, etc.
+	durationString := c.arguments[0]
+	duration, err := time.ParseDuration(durationString)
 	if err != nil {
-		return err
+		return fmt.Errorf("handler agg unable to parse duration string: %w", err)
 	}
+	fmt.Printf("Collecting feeds every %s\n", duration.String())
 
-	fmt.Printf("%+v\n", feed)
+	// sets up a ticker to execute the scraping
+	ticker := time.NewTicker(duration)
+	for ; ; <-ticker.C {
 
-	return nil
+		err := scrapeFeeds(s)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // prints out a list of feeds in the database
