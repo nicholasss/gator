@@ -152,7 +152,7 @@ func handlerAddFeed(s *state, c command) error {
 	}
 
 	username := s.cfg.CurrentUsername
-	user, err := s.db.GetUserByName(context.Background(), username)
+	userRecord, err := s.db.GetUserByName(context.Background(), username)
 	if err == sql.ErrNoRows {
 		fmt.Println("There does not appear to be any registered users.")
 		fmt.Println("Please ensure that you are registered and logged in.")
@@ -161,7 +161,7 @@ func handlerAddFeed(s *state, c command) error {
 		return err
 	}
 
-	userID := user.ID
+	userID := userRecord.ID
 	name := c.arguments[0]
 	URL := c.arguments[1]
 
@@ -177,7 +177,16 @@ func handlerAddFeed(s *state, c command) error {
 		return err
 	}
 
-	fmt.Printf("%+v\n", newFeed)
+	feedFollowRecord, err := s.db.CreateFeedFollow(context.Background(),
+		database.CreateFeedFollowParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			UserID:    userID,
+			FeedID:    newFeed.ID,
+		})
+
+	fmt.Printf(" &&& feed id: %s\n", feedFollowRecord.ID)
 	return nil
 }
 
@@ -279,7 +288,26 @@ func handlerFollow(s *state, c command) error {
 
 // prints out a list of all feeds the current user is following
 func handlerFollowing(s *state, c command) error {
+	if err := checkNumArgs(c.arguments, 0); err != nil {
+		return fmt.Errorf("handlerFollowing expected 0 arguments: %w", err)
+	}
 
+	user := s.cfg.CurrentUsername
+	userRecord, err := s.db.GetUserByName(context.Background(), user)
+	if err != nil {
+		return fmt.Errorf("handlerFollowing error fetching user by name from config: %w", err)
+	}
+
+	userID := userRecord.ID
+	feedRecords, err := s.db.GetUsersFeeds(context.Background(), userID)
+	if err != nil {
+		return fmt.Errorf("handlerFollowing error fetching users feeds by user id: %w", err)
+	}
+
+	fmt.Printf("User %s is following:\n", userRecord.Name)
+	for _, feedRecord := range feedRecords {
+		fmt.Printf(" - %s\n", feedRecord.Name)
+	}
 	return nil
 }
 
