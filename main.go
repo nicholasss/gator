@@ -159,16 +159,17 @@ func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) 
 
 // list of valid command handlers
 var validCommands map[string]string = map[string]string{
-	"addfeed":   "Adds a new feed to follow",
+	"addfeed":   "Adds a new feed and follows it. Requires a Name & URL.",
 	"agg":       "Performs a fetch of a link",
-	"feeds":     "Shows a list of all feeds",
-	"follow":    "Follow a feed",
-	"following": "Shows a list of all feeds current user is following",
-	"help":      "Shows available commands",
-	"login":     "Logs into a user",
-	"register":  "Registers a new user",
+	"feeds":     "Shows a list of all feeds.",
+	"follow":    "Follow a feed by its URL.",
+	"following": "Shows a list of all feeds the current user is following.",
+	"help":      "Shows available commands.",
+	"login":     "Logs into a user. Requires a Name.",
+	"register":  "Registers a new user. Requires a Name.",
 	"reset":     "Reset the 'users' and the 'feeds' table",
-	"users":     "Shows a list of all users",
+	"unfollow":  "Unfollow a feed by its URL.",
+	"users":     "Shows a list of all registered users.",
 }
 
 // add feed command
@@ -273,7 +274,7 @@ func handlerFollow(s *state, c command, user database.User) error {
 	feedRecord, err := s.db.GetFeedByURL(context.Background(), URL)
 	if err == sql.ErrNoRows {
 		fmt.Printf("Unable to find the feed by URL.\n")
-		fmt.Printf("You may need to add the feed first, with 'addfeed'.")
+		fmt.Printf("You may need to add the feed first, with 'addfeed'.\n")
 		os.Exit(1)
 	} else if err != nil {
 		return fmt.Errorf("handlerfollow error fetching feed by url: %w", err)
@@ -421,6 +422,39 @@ func handlerReset(s *state, c command) error {
 	return nil
 }
 
+// unfollows a particular feed
+func handlerUnfollow(s *state, c command, user database.User) error {
+	if err := checkNumArgs(c.arguments, 1); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// URL assumed to be first item in list
+	URL := c.arguments[0]
+	feedRecord, err := s.db.GetFeedByURL(context.Background(), URL)
+	if err == sql.ErrNoRows {
+		fmt.Printf("Unable to find the feed by URL.\n")
+		os.Exit(1)
+	} else if err != nil {
+		return fmt.Errorf("handlerUnfollow error fetching feed record: %w", err)
+	}
+
+	feedFollowRecord, err := s.db.DeleteFeedFollowForUserURL(
+		context.Background(),
+		database.DeleteFeedFollowForUserURLParams{
+			UserID: user.ID,
+			FeedID: feedRecord.ID,
+		})
+	if err != nil {
+		return fmt.Errorf("handlerUnfollow error deleting feed_follow record: %w", err)
+	}
+
+	fmt.Printf("Unfollowed '%s' successfully.\n", feedRecord.Name)
+	fmt.Printf(" &&& Unfollowed feedFollow record: %s", feedFollowRecord.ID)
+
+	return nil
+}
+
 // shows a list of all users from database,
 // as well as the current logged in user
 func handlerUsers(s *state, c command) error {
@@ -530,6 +564,7 @@ func main() {
 	cmds.registerCommand("login", handlerLogin)
 	cmds.registerCommand("register", handlerRegister)
 	cmds.registerCommand("reset", handlerReset)
+	cmds.registerCommand("unfollow", middlewareLoggedIn(handlerUnfollow))
 	cmds.registerCommand("users", handlerUsers)
 
 	// processing arguments
