@@ -400,7 +400,7 @@ func handlerRegister(s *state, c command) error {
 
 	// changes to this new user in the config
 	s.cfg.SetUser(username)
-	fmt.Printf("New user was created: '%s\nUser: %+v\n", username, dbUser)
+	fmt.Printf("New user was created: '%s'\nUser: %+v\n", username, dbUser)
 	return nil
 }
 
