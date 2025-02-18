@@ -127,6 +127,16 @@ func checkNumArgs(args []string, targetArgNum int) error {
 	return fmt.Errorf("error processing arguments in main.go:checkNumArgs()")
 }
 
+// ==========
+// MIDDLEWARE
+// ==========
+
+// Allows for all handlers that require a logged in user to to accept them as an argument.
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+
+	return nil
+}
+
 // ================
 // COMMAND HANDLERS
 // ================
