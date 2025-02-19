@@ -141,7 +141,6 @@ func scrapeFeeds(s *state) error {
 	if err != nil {
 		return fmt.Errorf("scraping feeds error fetching feed list from db: %w", err)
 	}
-	// fmt.Printf(" &&& last fetched at %v\n", feedRecord.LastFetchedAt)
 
 	// mark it as fetched
 	now := sql.NullTime{}
@@ -213,8 +212,6 @@ func scrapeFeeds(s *state) error {
 
 // time decoding function to try multiple different formats.
 func timeDecode(str string) (time.Time, error) {
-	// fmt.Printf(" &&& time format in timeDecode(): %s\n", str)
-
 	// RFC1123Z format
 	val, err := time.Parse(time.RFC1123Z, str)
 	if err == nil {
@@ -327,7 +324,6 @@ func handlerAddFeed(s *state, c command, user database.User) error {
 		})
 
 	fmt.Printf("%s is following: %s\n", user.Name, feedFollowRecord.FeedName)
-	// fmt.Printf(" &&& feed id: %s\n", feedFollowRecord.ID)
 	return nil
 }
 
@@ -380,8 +376,6 @@ func handlerBrowse(s *state, c command, user database.User) error {
 	if err != nil {
 		log.Fatalf("Unable to fetch posts from database: %s", err)
 	}
-
-	log.Printf("%+v\n", posts)
 
 	fmt.Printf("Showing %d posts:\n", limit)
 	for _, post := range posts {
@@ -441,7 +435,7 @@ func handlerFollow(s *state, c command, user database.User) error {
 		return fmt.Errorf("handlerfollow error fetching feed by url: %w", err)
 	}
 
-	feedFollowRecord, err := s.db.CreateFeedFollow(context.Background(),
+	_, err = s.db.CreateFeedFollow(context.Background(),
 		database.CreateFeedFollowParams{
 			ID:        uuid.New(),
 			CreatedAt: time.Now(),
@@ -455,9 +449,6 @@ func handlerFollow(s *state, c command, user database.User) error {
 
 	fmt.Printf("User %s is following\n", user.Name)
 	fmt.Printf("feed %s\n", feedRecord.Url)
-
-	// debug info
-	fmt.Printf(" &&& feed follow id: %s\n", feedFollowRecord.ID)
 
 	return nil
 }
@@ -601,7 +592,7 @@ func handlerUnfollow(s *state, c command, user database.User) error {
 		return fmt.Errorf("handlerUnfollow error fetching feed record: %w", err)
 	}
 
-	feedFollowRecord, err := s.db.DeleteFeedFollowForUserURL(
+	_, err = s.db.DeleteFeedFollowForUserURL(
 		context.Background(),
 		database.DeleteFeedFollowForUserURLParams{
 			UserID: user.ID,
@@ -612,7 +603,6 @@ func handlerUnfollow(s *state, c command, user database.User) error {
 	}
 
 	fmt.Printf("Unfollowed '%s' successfully.\n", feedRecord.Name)
-	fmt.Printf(" &&& Unfollowed feedFollow record: %s", feedFollowRecord.ID)
 
 	return nil
 }
