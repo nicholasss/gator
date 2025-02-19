@@ -136,7 +136,6 @@ func checkNumArgs(args []string, targetArgNum int) error {
 }
 
 func scrapeFeeds(s *state) error {
-	// TODO: need to take another look at the query to ensure that it does not show feeds that user does not follow
 	feedRecord, err := s.db.GetNextFeedToFetch(context.Background())
 	if err != nil {
 		return fmt.Errorf("scraping feeds error fetching feed list from db: %w", err)
