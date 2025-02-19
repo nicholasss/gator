@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 	"github.com/nicholasss/gator/internal/database"
 
 	// imported postgres driver for side effects
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 const agent = "gator"
@@ -42,6 +43,11 @@ type state struct {
 	db  *database.Queries
 	cfg *config.Config
 }
+
+// PostgreSQL Error Codes
+const (
+	UniqueViolationErr = pq.ErrorCode("23505")
+)
 
 // =========
 // RSS TYPES
@@ -129,12 +135,12 @@ func checkNumArgs(args []string, targetArgNum int) error {
 }
 
 func scrapeFeeds(s *state) error {
+	// TODO: need to take another look at the query to ensure that it does not show feeds that user does not follow
 	feedRecord, err := s.db.GetNextFeedToFetch(context.Background())
 	if err != nil {
 		return fmt.Errorf("scraping feeds error fetching feed list from db: %w", err)
 	}
-
-	fmt.Printf(" &&& last fetched at %v\n", feedRecord.LastFetchedAt)
+	// fmt.Printf(" &&& last fetched at %v\n", feedRecord.LastFetchedAt)
 
 	// mark it as fetched
 	now := sql.NullTime{}
@@ -166,14 +172,20 @@ func scrapeFeeds(s *state) error {
 			log.Printf("post description to NullString error: %s\n", err)
 		}
 
+		publishedTime, err := timeDecode(item.PubDate)
+		if err != nil {
+			log.Fatalf("Error decoding time format provided: %s", err)
+		}
 		publishedAt := sql.NullTime{}
-		err = publishedAt.Scan(item.PubDate)
+		err = publishedAt.Scan(publishedTime)
 		if err != nil {
 			log.Printf("post publishedAt to NullTime error: %s\n", err)
 		}
 
+		log.Printf("saving post '%s' to database\n", title)
+
 		// save the item to the database
-		postRecord, err := s.db.CreatePost(context.Background(), database.CreatePostParams{
+		_, err = s.db.CreatePost(context.Background(), database.CreatePostParams{
 			ID:          uuid.New(),
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -183,13 +195,52 @@ func scrapeFeeds(s *state) error {
 			PublishedAt: publishedAt,
 			FeedID:      feedRecord.ID,
 		})
-		if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == UniqueViolationErr {
+				log.Printf("Post was already added.\n")
+				continue
+			}
+
+		} else if err != nil {
 			log.Printf("error inserting to posts table: %s\n", err)
 		}
 
 	}
 
 	return nil
+}
+
+// time decoding function to try multiple different formats.
+func timeDecode(str string) (time.Time, error) {
+	// fmt.Printf(" &&& time format in timeDecode(): %s\n", str)
+
+	// RFC1123Z format
+	val, err := time.Parse(time.RFC1123Z, str)
+	if err == nil {
+		return val, nil
+	}
+	// UnixDate format
+	val, err = time.Parse(time.UnixDate, str)
+	if err == nil {
+		return val, nil
+	}
+	// ANSIC format
+	val, err = time.Parse(time.ANSIC, str)
+	if err == nil {
+		return val, nil
+	}
+	// DateTime format
+	val, err = time.Parse(time.DateTime, str)
+	if err == nil {
+		return val, nil
+	}
+	// RFC822Z
+	val, err = time.Parse(time.RFC822Z, str)
+	if err == nil {
+		return val, nil
+	}
+
+	return time.Time{}, fmt.Errorf("unknown time format: %s", str)
 }
 
 // ==========
@@ -256,7 +307,12 @@ func handlerAddFeed(s *state, c command, user database.User) error {
 		Url:       URL,
 		UserID:    userID,
 	})
-	if err != nil {
+	if pqErr, ok := err.(*pq.Error); ok {
+		if pqErr.Code == UniqueViolationErr {
+			log.Printf("Feed has already been added.\n")
+			return nil
+		}
+	} else if err != nil {
 		return fmt.Errorf("handlerAddFeed error inserting new feed: %w", err)
 	}
 
@@ -269,8 +325,8 @@ func handlerAddFeed(s *state, c command, user database.User) error {
 			FeedID:    newFeed.ID,
 		})
 
-	fmt.Printf("%s is following %s\n", user.Name, newFeed.Name)
-	fmt.Printf(" &&& feed id: %s\n", feedFollowRecord.ID)
+	fmt.Printf("%s is following: %s\n", user.Name, feedFollowRecord.FeedName)
+	// fmt.Printf(" &&& feed id: %s\n", feedFollowRecord.ID)
 	return nil
 }
 
@@ -299,11 +355,39 @@ func handlerAgg(s *state, c command) error {
 		if err != nil {
 			return err
 		}
+
+		fmt.Printf("Waiting %s to fetch next feed.\n", duration.String())
 	}
 }
 
 // browse the downloaded posts.
 func handlerBrowse(s *state, c command, user database.User) error {
+	var limit int
+	if err := checkNumArgs(c.arguments, 1); err != nil {
+		limit = 2
+	} else {
+		limit, err = strconv.Atoi(c.arguments[0])
+		if err != nil {
+			return err
+		}
+	}
+
+	posts, err := s.db.GetPostsForUser(context.Background(), database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit:  int64(limit),
+	})
+	if err != nil {
+		log.Fatalf("Unable to fetch posts from database: %s", err)
+	}
+
+	log.Printf("%+v\n", posts)
+
+	fmt.Printf("Showing %d posts:\n", limit)
+	for _, post := range posts {
+		fmt.Printf(" * %s * \n", post.Title)
+		fmt.Printf(" * Published at: %s\n", post.PublishedAt.Time.String())
+		fmt.Printf("%s\n\n", post.Description.String)
+	}
 
 	return nil
 }
@@ -368,7 +452,7 @@ func handlerFollow(s *state, c command, user database.User) error {
 		return fmt.Errorf("handlerFollow error creating feed follow record: %w", err)
 	}
 
-	fmt.Printf("User %s is now following\n", user.Name)
+	fmt.Printf("User %s is following\n", user.Name)
 	fmt.Printf("feed %s\n", feedRecord.Url)
 
 	// debug info
@@ -499,6 +583,7 @@ func handlerReset(s *state, c command) error {
 }
 
 // unfollows a particular feed
+// TODO: does not remove the feed from being aggregated?
 func handlerUnfollow(s *state, c command, user database.User) error {
 	if err := checkNumArgs(c.arguments, 1); err != nil {
 		fmt.Println(err)
@@ -633,6 +718,7 @@ func main() {
 	cmds := newCommands()
 	cmds.registerCommand("addfeed", middlewareLoggedIn(handlerAddFeed))
 	cmds.registerCommand("agg", handlerAgg)
+	cmds.registerCommand("browse", middlewareLoggedIn(handlerBrowse))
 	cmds.registerCommand("feeds", handlerFeeds)
 	cmds.registerCommand("follow", middlewareLoggedIn(handlerFollow))
 	cmds.registerCommand("following", middlewareLoggedIn(handlerFollowing))
