@@ -155,7 +155,7 @@ func scrapeFeeds(s *state) error {
 		return fmt.Errorf("scraping feeds error updating feed as fetched: %w", err)
 	}
 
-	fmt.Printf("Fetching '%s' feed at '%s'.\n", feedRecord.Name, feedRecord.Url)
+	log.Printf("Fetching '%s' feed at '%s'.\n", feedRecord.Name, feedRecord.Url)
 	RSSItems, err := fetchFeed(context.Background(), feedRecord.Url)
 	if err != nil {
 		return fmt.Errorf("scraping feeds error fetching feeds: %w", err)
@@ -198,7 +198,7 @@ func scrapeFeeds(s *state) error {
 		})
 		if pqErr, ok := err.(*pq.Error); ok {
 			if pqErr.Code == UniqueViolationErr {
-				log.Printf("Post was already added.\n")
+				log.Printf("Post was already added based on its URL.\n")
 				continue
 			}
 
@@ -346,7 +346,7 @@ func handlerAgg(s *state, c command) error {
 	if err != nil {
 		return fmt.Errorf("handler agg unable to parse duration string: %w", err)
 	}
-	fmt.Printf("Collecting feeds every %s\n", duration.String())
+	log.Printf("Collecting feeds every %s\n", duration.String())
 
 	// sets up a ticker to execute the scraping
 	ticker := time.NewTicker(duration)
@@ -357,7 +357,7 @@ func handlerAgg(s *state, c command) error {
 			return err
 		}
 
-		fmt.Printf("Waiting %s to fetch next feed.\n", duration.String())
+		log.Printf("Waiting %s to fetch next feed.\n", duration.String())
 	}
 }
 
