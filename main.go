@@ -256,10 +256,11 @@ func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) 
 		userRecord, err := s.db.GetUserByName(context.Background(), username)
 
 		if err == sql.ErrNoRows {
-			fmt.Println("There does not appear to be any registered users.")
+			log.Println("There does not appear to be any registered users.")
 			fmt.Println("Please ensure that you are registered and logged in.")
 			os.Exit(1)
 		} else if err != nil {
+			log.Println("Unknown error fetching user from database.")
 			return fmt.Errorf("middlewareLoggedIn error fetching user by name: %w", err)
 		}
 
@@ -323,7 +324,7 @@ func handlerAddFeed(s *state, c command, user database.User) error {
 			FeedID:    newFeed.ID,
 		})
 
-	fmt.Printf("%s is following: %s\n", user.Name, feedFollowRecord.FeedName)
+	fmt.Printf("%s is now following %s\n", user.Name, feedFollowRecord.FeedName)
 	return nil
 }
 
@@ -376,6 +377,7 @@ func handlerBrowse(s *state, c command, user database.User) error {
 	if err != nil {
 		log.Fatalf("Unable to fetch posts from database: %s", err)
 	}
+	log.Printf("Fetched %d posts from database\n", limit)
 
 	fmt.Printf("Showing %d posts:\n", limit)
 	for _, post := range posts {
@@ -399,7 +401,7 @@ func handlerFeeds(s *state, c command) error {
 		return fmt.Errorf("handlerFeeds error fetching all feeds: %w", err)
 	}
 
-	fmt.Printf("List of all feeds in the database:\n")
+	fmt.Printf("Feeds that have been added:\n")
 
 	for i, feed := range feeds {
 		user, err := s.db.GetUserByID(context.Background(), feed.UserID)
@@ -408,7 +410,7 @@ func handlerFeeds(s *state, c command) error {
 		}
 
 		fmt.Printf("Feed #%d:\n", i+1)
-		fmt.Printf(" - User: %s\n", user.Name)
+		fmt.Printf(" - Added by: %s\n", user.Name)
 		fmt.Printf(" - Name: %s\n", feed.Name)
 		fmt.Printf(" - URL:  %s\n", feed.Url)
 		fmt.Printf("\n")
@@ -428,7 +430,7 @@ func handlerFollow(s *state, c command, user database.User) error {
 	URL := c.arguments[0]
 	feedRecord, err := s.db.GetFeedByURL(context.Background(), URL)
 	if err == sql.ErrNoRows {
-		fmt.Printf("Unable to find the feed by URL.\n")
+		log.Printf("Unable to find the feed using a URL.\n")
 		fmt.Printf("You may need to add the feed first, with 'addfeed'.\n")
 		os.Exit(1)
 	} else if err != nil {
@@ -447,9 +449,7 @@ func handlerFollow(s *state, c command, user database.User) error {
 		return fmt.Errorf("handlerFollow error creating feed follow record: %w", err)
 	}
 
-	fmt.Printf("User %s is following\n", user.Name)
-	fmt.Printf("feed %s\n", feedRecord.Url)
-
+	fmt.Printf("User %s is now following %s\n", user.Name, feedRecord.Name)
 	return nil
 }
 
@@ -465,7 +465,7 @@ func handlerFollowing(s *state, c command, user database.User) error {
 		return fmt.Errorf("handlerFollowing error fetching users feeds by user id: %w", err)
 	}
 
-	fmt.Printf("User %s is following:\n", user.Name)
+	fmt.Printf("User %s is following these feeds:\n", user.Name)
 	for _, feedFollowRecord := range feedFollowRecords {
 		feedRecord, err := s.db.GetFeedByID(context.Background(), feedFollowRecord.FeedID)
 		if err != nil {
@@ -507,6 +507,7 @@ func handlerLogin(s *state, c command) error {
 	// check database for user
 	dbFoundUser, _ := s.db.GetUserByName(context.Background(), username)
 	if dbFoundUser.Name != username { // user not in database
+		log.Printf("Unable to find record in database for %s.\n", username)
 		fmt.Printf("User '%s' does not exists.\n", username)
 		os.Exit(1)
 	}
@@ -575,7 +576,6 @@ func handlerReset(s *state, c command) error {
 }
 
 // unfollows a particular feed
-// TODO: does not remove the feed from being aggregated?
 func handlerUnfollow(s *state, c command, user database.User) error {
 	if err := checkNumArgs(c.arguments, 1); err != nil {
 		fmt.Println(err)
@@ -585,6 +585,7 @@ func handlerUnfollow(s *state, c command, user database.User) error {
 	// URL assumed to be first item in list
 	URL := c.arguments[0]
 	feedRecord, err := s.db.GetFeedByURL(context.Background(), URL)
+	// TODO: Look into swapping to psql error check
 	if err == sql.ErrNoRows {
 		fmt.Printf("Unable to find the feed by URL.\n")
 		os.Exit(1)
@@ -603,7 +604,6 @@ func handlerUnfollow(s *state, c command, user database.User) error {
 	}
 
 	fmt.Printf("Unfollowed '%s' successfully.\n", feedRecord.Name)
-
 	return nil
 }
 
@@ -623,7 +623,7 @@ func handlerUsers(s *state, c command) error {
 	}
 
 	if len(dbUsers) == 0 {
-		fmt.Println("There are currently no registered users.")
+		log.Println("There are currently no registered users.")
 		fmt.Println("You may need to register first with 'register'.")
 		os.Exit(1)
 	}
@@ -693,10 +693,12 @@ func main() {
 
 	// opening database connection
 	db, err := sql.Open("postgres", cfg.DBURL)
+	log.Printf("Opened connection to postgres\n")
 	if err != nil {
 		fmt.Printf("Error occured: %v", err)
 		os.Exit(1)
 	}
+	// defer sql.close?
 
 	// setting up program state
 	dbQueries := database.New(db)
@@ -741,4 +743,6 @@ func main() {
 		fmt.Printf("command error: %v\n", err)
 		os.Exit(1)
 	}
+
+	log.Printf("Closed connection to postgres gracefully.\n")
 }
