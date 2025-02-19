@@ -22,7 +22,13 @@ import (
 	"github.com/lib/pq"
 )
 
+// header agent-identifier
 const agent = "gator"
+
+// PostgreSQL Error Codes
+const (
+	UniqueViolationErr = pq.ErrorCode("23505")
+)
 
 // ================
 // TYPE DEFINITIONS
@@ -43,11 +49,6 @@ type state struct {
 	db  *database.Queries
 	cfg *config.Config
 }
-
-// PostgreSQL Error Codes
-const (
-	UniqueViolationErr = pq.ErrorCode("23505")
-)
 
 // =========
 // RSS TYPES
