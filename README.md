@@ -43,6 +43,6 @@ The username will get filled in when a user registers with the program.
 - addfeed: Adds an RSS feed to begin following.
     `<Name> <URL>`
 - agg: Begins aggregating an RSS feed for browsing later.
-    Must specify a time duration between requests, e.g. 30m, 1h, etc.
+    `<Duration>` Must specify a time duration between requests, e.g. 30m, 1h, etc.
 - browse: Lists out the latest RSS posts that have been aggregated.
     `<Number>` Specify a number of posts to view at once.
